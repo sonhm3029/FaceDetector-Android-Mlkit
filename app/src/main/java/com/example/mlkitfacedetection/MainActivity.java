@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity implements ImageAnalysis.Ana
     ImageButton flipCamera;
     private PreviewView previewView;
     ImageAnalysis imageAnalysis;
+    private FaceDetector faceDetector;
 
     int cameraFacing = CameraSelector.LENS_FACING_BACK;
 
@@ -85,6 +86,8 @@ public class MainActivity extends AppCompatActivity implements ImageAnalysis.Ana
                 startCamera(cameraFacing);
             }
         });
+
+        initFaceDetector();
     }
 
     public void startCamera(int cameraFacing) {
@@ -121,6 +124,15 @@ public class MainActivity extends AppCompatActivity implements ImageAnalysis.Ana
         }, ContextCompat.getMainExecutor(this));
     }
 
+    private void initFaceDetector() {
+        FaceDetectorOptions options = new FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
+                .build();
+
+        faceDetector = FaceDetection.getClient(options);
+    }
+
     private int aspectRatio(int width, int height) {
         double previewRatio = (double) Math.max(width, height) / Math.min(width, height);
         if(Math.abs(previewRatio - 4.0 / 3.0) <= Math.abs(previewRatio - 16.0 / 9.0)) {
@@ -131,7 +143,33 @@ public class MainActivity extends AppCompatActivity implements ImageAnalysis.Ana
 
     @Override
     public void analyze(@NonNull ImageProxy imageProxy) {
-        Log.i("DETECTION", "HEIGHT " + imageProxy.getHeight());
-        imageProxy.close();
+        Image mediaImage = imageProxy.getImage();
+        if (mediaImage != null) {
+            InputImage image =
+                    InputImage.fromMediaImage(mediaImage, imageProxy.getImageInfo().getRotationDegrees());
+            faceDetector.process(image)
+                    .addOnSuccessListener(new OnSuccessListener<List<Face>>() {
+                        @Override
+                        public void onSuccess(List<Face> faces) {
+                            // Process detected faces here
+                            for (Face face : faces) {
+                                // You can get face bounding box, landmarks, etc. here
+                                Rect bounds = face.getBoundingBox();
+                                // Process other face information as needed
+                                Log.i("DETCTION", bounds.toString());
+                            }
+                            imageProxy.close();
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            // Handle any errors
+                            e.printStackTrace();
+                        }
+                    });
+        }
     }
+
+
 }
